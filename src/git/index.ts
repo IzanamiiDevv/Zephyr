@@ -18,3 +18,9 @@ export {
 export { resolveBranchStatus }    from './StatusResolver.js';
 export { SafeProdWatcher }        from './SafeProdWatcher.js';
 export { bootstrapRepo }          from './RepoBootstrap.js';
+export {
+  createBranch,
+  registerBranch,
+  deleteBranch,
+  openPullRequestInBrowser,
+}                                 from './BranchWorkflows.js';
