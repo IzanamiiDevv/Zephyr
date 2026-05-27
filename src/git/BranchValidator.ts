@@ -6,9 +6,6 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-/**
- * Validate a proposed new branch name against Zephyr rules.
- */
 export function validateNewBranchName(name: string): ValidationResult {
   const errors:   string[] = [];
   const warnings: string[] = [];
@@ -61,11 +58,6 @@ export function validateNewBranchName(name: string): ValidationResult {
   return { valid: errors.length === 0, errors, warnings };
 }
 
-/**
- * Validate the source branch a new branch is being created from.
- * Standard rule: must originate from safe-production.
- * Creating from other branches requires explicit approval flag.
- */
 export function validateSourceBranch(
   sourceBranch: string,
   requireApproval = false,
@@ -111,9 +103,6 @@ export function validateSourceBranch(
   return { valid: false, errors, warnings };
 }
 
-/**
- * Validate a conventional commit message against the expected prefix.
- */
 export function validateCommitMessage(
   message: string,
   expectedPrefix: string | null,

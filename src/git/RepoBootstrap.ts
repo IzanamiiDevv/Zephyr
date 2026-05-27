@@ -8,10 +8,6 @@ export interface BootstrapResult {
   error:         string | null;
 }
 
-/**
- * Run once on app start.
- * Detects whether cwd is a git repo and returns a ready GitService.
- */
 export async function bootstrapRepo(cwd: string): Promise<BootstrapResult> {
   const git = new GitService(cwd);
 

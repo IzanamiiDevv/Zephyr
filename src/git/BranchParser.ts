@@ -43,33 +43,20 @@ export type ParsedBranch =
   | ParsedReleaseBranch
   | ParsedUnknownBranch;
 
-/**
- * Parse any branch name into a structured object.
- *
- * Patterns:
- *   production/<type>/<scope>/<name>
- *   production/<type>/<scope>/copyof/<name>
- *   release/<version>
- *   main | production | safe-production
- */
 export function parseBranch(raw: string): ParsedBranch {
   const name = raw.trim();
 
-  // Core branches
   if (['main', 'production', 'safe-production'].includes(name)) {
     return { kind: 'core', name: name as CoreBranch, raw };
   }
 
-  // Release branches
   if (name.startsWith('release/')) {
     const version = name.slice('release/'.length);
     return { kind: 'release', version, raw };
   }
 
-  // Dev branches: production/<type>/<scope>/[copyof/]<name>
   if (name.startsWith('production/')) {
     const parts = name.split('/');
-    // Minimum: production / type / scope / name  = 4 parts
     if (parts.length >= 4) {
       const type  = parts[1] as BranchType;
       const scope = parts[2] as string;
@@ -78,7 +65,6 @@ export function parseBranch(raw: string): ParsedBranch {
         return { kind: 'unknown', raw };
       }
 
-      // copyof pattern: production/<type>/<scope>/copyof/<name>
       if (parts[3] === 'copyof' && parts[4]) {
         return {
           kind:    'dev',
@@ -105,9 +91,6 @@ export function parseBranch(raw: string): ParsedBranch {
   return { kind: 'unknown', raw };
 }
 
-/**
- * Build a branch name string from parts.
- */
 export function buildBranchName(
   type: BranchType,
   scope: string,
@@ -127,9 +110,6 @@ export function buildBranchName(
   return `production/${type}/${safeScope}/${safeName}`;
 }
 
-/**
- * Convert a human label into a branch-safe slug.
- */
 export function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -140,10 +120,6 @@ export function slugify(input: string): string {
     .replace(/^-|-$/g, '');
 }
 
-/**
- * Return the conventional commit prefix from a parsed dev branch.
- * e.g.  feat(auth):
- */
 export function commitPrefix(branch: ParsedBranch): string | null {
   if (branch.kind !== 'dev') return null;
   return `${branch.type}(${branch.scope}):`;
