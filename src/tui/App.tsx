@@ -9,10 +9,16 @@ import { BranchesScreen } from './screens/BranchesScreen.js';
 import { StatusScreen }   from './screens/StatusScreen.js';
 import { CommitsScreen }  from './screens/CommitsScreen.js';
 import { RawGitScreen }   from './screens/RawGitScreen.js';
+import { ErrorScreen }    from './screens/ErrorScreen.js';
 import { useAppStore }    from './store/appStore.js';
+import { bootstrapRepo }  from '../git/RepoBootstrap.js';
+import { SafeProdWatcher } from '../git/SafeProdWatcher.js';
 
 function ScreenRouter() {
-  const { activeScreen } = useAppStore();
+  const { activeScreen, isGitRepo } = useAppStore();
+
+  if (!isGitRepo) return <ErrorScreen />;
+
   switch (activeScreen) {
     case 'home':     return <HomeScreen />;
     case 'branches': return <BranchesScreen />;
@@ -26,29 +32,70 @@ function ScreenRouter() {
 export function App() {
   const { exit } = useApp();
   const { stdout } = useStdout();
-  const { inputActive, setInputActive, setInputValue, setSafeProdStatus } = useAppStore();
+  const {
+    inputActive, setInputActive, setInputValue,
+    setSafeProdStatus, setRepoContext, setGitService,
+    setRepoError, refreshBranches, refreshStatus,
+    isGitRepo,
+  } = useAppStore();
 
   const [termSize, setTermSize] = useState({
     columns: stdout?.columns ?? 80,
     rows:    stdout?.rows    ?? 24,
   });
 
+  // ── Terminal resize ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!stdout) return;
-
     const onResize = () => {
-      // Clear alt screen buffer before Ink repaints
       process.stdout.write('\x1B[2J\x1B[H');
       setTermSize({
         columns: stdout.columns ?? 80,
         rows:    stdout.rows    ?? 24,
       });
     };
-
     stdout.on('resize', onResize);
     return () => { stdout.off('resize', onResize); };
   }, [stdout]);
 
+  // ── Bootstrap repo on mount ──────────────────────────────────────────────
+  useEffect(() => {
+    let watcher: SafeProdWatcher | null = null;
+
+    async function init() {
+      setSafeProdStatus('checking');
+      const result = await bootstrapRepo(process.cwd());
+
+      if (!result.ok || !result.git) {
+        setRepoError(result.error);
+        setSafeProdStatus('error');
+        return;
+      }
+
+      setGitService(result.git);
+      setRepoContext(result.repoName, result.currentBranch);
+
+      // Initial data load
+      await Promise.all([
+        refreshBranches(),
+        refreshStatus(),
+      ]);
+
+      // Start safe-prod watcher (60s polling)
+      watcher = new SafeProdWatcher(
+        result.git,
+        (status) => setSafeProdStatus(status),
+        60_000,
+      );
+      watcher.start();
+    }
+
+    void init();
+
+    return () => { watcher?.stop(); };
+  }, []);
+
+  // ── Global keybinds ──────────────────────────────────────────────────────
   useInput((input, key) => {
     if (input === '/' && !inputActive) {
       setInputActive(true);
@@ -60,20 +107,10 @@ export function App() {
     }
   });
 
-  useEffect(() => {
-    setSafeProdStatus('checking');
-    const t = setTimeout(() => setSafeProdStatus('synced'), 1500);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
-    <Box
-      flexDirection="column"
-      height={termSize.rows}
-      width={termSize.columns}
-    >
+    <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
       <Header     termWidth={termSize.columns} />
-      <NavBar     termWidth={termSize.columns} />
+      {isGitRepo && <NavBar termWidth={termSize.columns} />}
       <Box flexGrow={1} flexDirection="column" overflow="hidden">
         <ScreenRouter />
       </Box>

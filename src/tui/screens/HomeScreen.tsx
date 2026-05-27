@@ -1,6 +1,8 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../theme.js';
+import { useAppStore } from '../store/appStore.js';
+import { parseBranch } from '../../git/BranchParser.js';
 
 const QUICK_ACTIONS = [
   { key: '/branches', label: 'Manage Branches',  hint: 'create, register, switch' },
@@ -10,19 +12,53 @@ const QUICK_ACTIONS = [
 ];
 
 export function HomeScreen() {
+  const { repoName, currentBranch, branchStatus, localBranches } = useAppStore();
+  const parsed = parseBranch(currentBranch);
+
+  const branchTypeLabel =
+    parsed.kind === 'dev'
+      ? `${parsed.type}(${parsed.scope})`
+      : parsed.kind === 'core'
+      ? parsed.name
+      : currentBranch;
+
   return (
     <Box flexDirection="column" padding={2} gap={1}>
-      <Box flexDirection="column" marginBottom={1}>
+
+      {/* Repo summary */}
+      <Box flexDirection="column" gap={0}>
         <Text color={theme.text} bold>Welcome to Zephyr</Text>
-        <Text color={theme.textMuted}>
-          Your structured git workflow orchestrator. Navigate with{' '}
-          <Text color={theme.accent}>Tab</Text> or type{' '}
-          <Text color={theme.accent}>/command</Text> to get started.
-        </Text>
+        <Box gap={2} marginTop={1}>
+          <Box gap={1}>
+            <Text color={theme.textMuted}>repo</Text>
+            <Text color={theme.accent} bold>{repoName || '—'}</Text>
+          </Box>
+          <Text color={theme.textMuted}>·</Text>
+          <Box gap={1}>
+            <Text color={theme.textMuted}>branch</Text>
+            <Text color={theme.text} bold>{branchTypeLabel || '—'}</Text>
+          </Box>
+          <Text color={theme.textMuted}>·</Text>
+          <Box gap={1}>
+            <Text color={theme.textMuted}>branches</Text>
+            <Text color={theme.text} bold>{localBranches.length}</Text>
+          </Box>
+          {branchStatus && (
+            <>
+              <Text color={theme.textMuted}>·</Text>
+              <Box gap={1}>
+                <Text color={branchStatus.isDirty ? theme.warn : theme.success}>
+                  {branchStatus.isDirty ? '● dirty' : '● clean'}
+                </Text>
+              </Box>
+            </>
+          )}
+        </Box>
       </Box>
 
       <Text color={theme.panel}>{'─'.repeat(60)}</Text>
 
+      {/* Quick actions */}
       <Box flexDirection="column" gap={0}>
         <Text color={theme.textDim} bold>QUICK ACTIONS</Text>
         <Box flexDirection="column" marginTop={1} gap={0}>
@@ -38,6 +74,7 @@ export function HomeScreen() {
 
       <Text color={theme.panel}>{'─'.repeat(60)}</Text>
 
+      {/* Branch model */}
       <Box flexDirection="column" gap={0}>
         <Text color={theme.textDim} bold>BRANCH MODEL</Text>
         <Box flexDirection="column" marginTop={1} gap={0}>
@@ -54,12 +91,6 @@ export function HomeScreen() {
             </Box>
           ))}
         </Box>
-      </Box>
-
-      <Box marginTop={1}>
-        <Text color={theme.textMuted} dimColor>
-          ⚠  Layer 1 — TUI Shell only. Git functions active in Layer 2.
-        </Text>
       </Box>
     </Box>
   );

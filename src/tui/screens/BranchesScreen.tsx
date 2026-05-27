@@ -1,16 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../theme.js';
-
-const BRANCH_ACTIONS = [
-  { key: 'N', label: 'New branch',      desc: 'Create production/<type>/<scope>/<name> from safe-production' },
-  { key: 'R', label: 'Register branch', desc: 'Push local branch to remote, make accessible to team' },
-  { key: 'P', label: 'Pull request',    desc: 'Open PR into production branch' },
-  { key: 'S', label: 'Sub-branch',      desc: 'Fork from an existing production/* branch' },
-  { key: 'D', label: 'Delete branch',   desc: 'Remove local + remote branch after merge' },
-];
+import { useAppStore } from '../store/appStore.js';
+import { parseBranch } from '../../git/BranchParser.js';
 
 export function BranchesScreen() {
+  const { localBranches, currentBranch, refreshBranches } = useAppStore();
+
+  useEffect(() => { void refreshBranches(); }, []);
+
   return (
     <Box flexDirection="column" padding={2} gap={1}>
       <Text color={theme.text} bold>Branch Management</Text>
@@ -22,13 +20,20 @@ export function BranchesScreen() {
 
       <Text color={theme.panel}>{'─'.repeat(60)}</Text>
 
+      {/* Actions hint */}
       <Box flexDirection="column" gap={0}>
         <Text color={theme.textDim} bold>AVAILABLE ACTIONS</Text>
         <Box flexDirection="column" marginTop={1} gap={0}>
-          {BRANCH_ACTIONS.map(({ key, label, desc }) => (
+          {[
+            ['N', 'New branch',      'Create production/<type>/<scope>/<name>'],
+            ['R', 'Register branch', 'Push local branch to remote'],
+            ['P', 'Pull request',    'Open PR into production'],
+            ['S', 'Sub-branch',      'Fork from an existing production/* branch'],
+            ['D', 'Delete branch',   'Remove local + remote after merge'],
+          ].map(([key, label, desc]) => (
             <Box key={key} gap={2}>
               <Text color={theme.bg} backgroundColor={theme.panel}>{` ${key} `}</Text>
-              <Text color={theme.text} bold>{label.padEnd(20)}</Text>
+              <Text color={theme.text} bold>{(label ?? '').padEnd(20)}</Text>
               <Text color={theme.textMuted}>{desc}</Text>
             </Box>
           ))}
@@ -37,12 +42,42 @@ export function BranchesScreen() {
 
       <Text color={theme.panel}>{'─'.repeat(60)}</Text>
 
+      {/* Live branch list */}
       <Box flexDirection="column" gap={0}>
         <Text color={theme.textDim} bold>LOCAL BRANCHES</Text>
-        <Box marginTop={1}>
-          <Text color={theme.textMuted} dimColor>
-            ○  Branch list loads in Layer 2 (git integration).
-          </Text>
+        <Box flexDirection="column" marginTop={1} gap={0}>
+          {localBranches.length === 0 ? (
+            <Text color={theme.textMuted} dimColor>Loading branches…</Text>
+          ) : (
+            localBranches.map((b) => {
+              const parsed  = parseBranch(b.name);
+              const isCurrent = b.name === currentBranch;
+
+              const typeColor =
+                parsed.kind === 'core'    ? theme.success
+                : parsed.kind === 'dev'   ? theme.accent
+                : parsed.kind === 'release' ? theme.warn
+                : theme.textMuted;
+
+              const typeLabel =
+                parsed.kind === 'dev'     ? `${parsed.type}(${parsed.scope})`
+                : parsed.kind === 'release' ? `release/${parsed.version}`
+                : parsed.kind === 'core'  ? parsed.name
+                : 'unknown';
+
+              return (
+                <Box key={b.name} gap={2}>
+                  <Text color={isCurrent ? theme.accent : theme.textMuted}>
+                    {isCurrent ? '▶' : ' '}
+                  </Text>
+                  <Text color={isCurrent ? theme.text : theme.textMuted} bold={isCurrent}>
+                    {b.name.padEnd(45)}
+                  </Text>
+                  <Text color={typeColor}>{typeLabel}</Text>
+                </Box>
+              );
+            })
+          )}
         </Box>
       </Box>
     </Box>
