@@ -1,11 +1,10 @@
 export const theme = {
-  // Core palette
+  
   bg:        '#091413',
   panel:     '#285A48',
   accent:    '#408A71',
   text:      '#B0E4CC',
 
-  // Derived
   textDim:   '#6BAF96',
   textMuted: '#3D7A63',
   border:    '#285A48',

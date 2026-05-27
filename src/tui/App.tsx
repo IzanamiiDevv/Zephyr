@@ -44,7 +44,6 @@ export function App() {
     rows:    stdout?.rows    ?? 24,
   });
 
-  // ── Terminal resize ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!stdout) return;
     const onResize = () => {
@@ -58,7 +57,6 @@ export function App() {
     return () => { stdout.off('resize', onResize); };
   }, [stdout]);
 
-  // ── Bootstrap repo on mount ──────────────────────────────────────────────
   useEffect(() => {
     let watcher: SafeProdWatcher | null = null;
 
@@ -75,13 +73,11 @@ export function App() {
       setGitService(result.git);
       setRepoContext(result.repoName, result.currentBranch);
 
-      // Initial data load
       await Promise.all([
         refreshBranches(),
         refreshStatus(),
       ]);
 
-      // Start safe-prod watcher (60s polling)
       watcher = new SafeProdWatcher(
         result.git,
         (status) => setSafeProdStatus(status),
@@ -95,7 +91,6 @@ export function App() {
     return () => { watcher?.stop(); };
   }, []);
 
-  // ── Global keybinds ──────────────────────────────────────────────────────
   useInput((input, key) => {
     if (input === '/' && !inputActive) {
       setInputActive(true);

@@ -7,7 +7,6 @@ import { bootstrapRepo } from '../../git/RepoBootstrap.js';
 export function ErrorScreen() {
   const { repoError, setRepoContext, setGitService, setRepoError } = useAppStore();
 
-  // Allow user to retry by pressing R
   useInput(async (input) => {
     if (input.toLowerCase() === 'r') {
       const result = await bootstrapRepo(process.cwd());

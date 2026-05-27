@@ -19,22 +19,18 @@ export interface BranchStatus {
 }
 
 export interface AppState {
-  // ── Navigation ──────────────────────────────────────────────────────────
   activeScreen: ScreenId;
   setScreen: (s: ScreenId) => void;
 
-  // ── Command input bar ───────────────────────────────────────────────────
   inputActive:    boolean;
   inputValue:     string;
   setInputActive: (v: boolean) => void;
   setInputValue:  (v: string) => void;
 
-  // ── Safe-production watcher ─────────────────────────────────────────────
   safeProdStatus:    SafeProdStatus;
   safeProdLastCheck: string;
   setSafeProdStatus: (s: SafeProdStatus) => void;
 
-  // ── Repo context ────────────────────────────────────────────────────────
   isGitRepo:      boolean;
   repoError:      string | null;
   repoName:       string;
@@ -44,35 +40,29 @@ export interface AppState {
   setGitService:  (git: GitService | null) => void;
   setRepoError:   (err: string | null) => void;
 
-  // ── Branch list ─────────────────────────────────────────────────────────
   localBranches:    BranchInfo[];
   setLocalBranches: (branches: BranchInfo[]) => void;
   refreshBranches:  () => Promise<void>;
 
-  // ── Branch status ───────────────────────────────────────────────────────
   branchStatus:    BranchStatus | null;
   statusLoading:   boolean;
   setBranchStatus: (s: BranchStatus | null) => void;
   setStatusLoading:(v: boolean) => void;
   refreshStatus:   () => Promise<void>;
 
-  // ── Footer message ──────────────────────────────────────────────────────
   footerMessage:    string | null;
   setFooterMessage: (msg: string | null) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  // ── Navigation ──────────────────────────────────────────────────────────
   activeScreen: 'home',
   setScreen: (s) => set({ activeScreen: s }),
 
-  // ── Command input ───────────────────────────────────────────────────────
   inputActive:    false,
   inputValue:     '',
   setInputActive: (v) => set({ inputActive: v, inputValue: '' }),
   setInputValue:  (v) => set({ inputValue: v }),
 
-  // ── Safe-prod indicator ─────────────────────────────────────────────────
   safeProdStatus:    'checking',
   safeProdLastCheck: '--:--',
   setSafeProdStatus: (s) =>
@@ -85,7 +75,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     }),
 
-  // ── Repo context ────────────────────────────────────────────────────────
   isGitRepo:     true,
   repoError:     null,
   repoName:      '',
@@ -96,7 +85,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGitService: (git) => set({ gitService: git }),
   setRepoError:  (err) => set({ repoError: err, isGitRepo: err === null }),
 
-  // ── Branch list ─────────────────────────────────────────────────────────
   localBranches:    [],
   setLocalBranches: (branches) => set({ localBranches: branches }),
   refreshBranches: async () => {
@@ -108,7 +96,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { /* silently ignore */ }
   },
 
-  // ── Branch status ───────────────────────────────────────────────────────
   branchStatus:    null,
   statusLoading:   false,
   setBranchStatus: (s) => set({ branchStatus: s }),
@@ -126,7 +113,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // ── Footer message ──────────────────────────────────────────────────────
   footerMessage:    null,
   setFooterMessage: (msg) => set({ footerMessage: msg }),
 }));

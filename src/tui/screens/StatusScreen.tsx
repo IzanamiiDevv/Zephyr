@@ -24,7 +24,6 @@ export function StatusScreen() {
     refreshStatus, currentBranch,
   } = useAppStore();
 
-  // Refresh on mount
   useEffect(() => { void refreshStatus(); }, []);
 
   const parsed = parseBranch(currentBranch);
