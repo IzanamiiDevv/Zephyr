@@ -28,23 +28,29 @@ function SafeProdDot({ status }: { status: SafeProdStatus }) {
     : 'safe-prod checking…';
 
   return (
-    <Box>
-      <Text color={dotColor}>● </Text>
+    <Box gap={1}>
+      <Text color={dotColor}>●</Text>
       <Text color={status === 'behind' ? theme.warn : theme.textMuted}>{label}</Text>
     </Box>
   );
 }
 
 export function Footer({ termWidth: _ }: Props) {
-  const { safeProdStatus, safeProdLastCheck, footerMessage } = useAppStore();
+  const { safeProdStatus, safeProdLastCheck, footerMessage, networkStatus } = useAppStore();
 
   return (
     <Box borderStyle="single" borderColor={theme.panel} paddingX={1} justifyContent="space-between">
-      <SafeProdDot status={safeProdStatus} />
+      <Box gap={2}>
+        <SafeProdDot status={safeProdStatus} />
+        {networkStatus === 'offline' && (
+          <Box gap={1}>
+            <Text color={theme.danger}>●</Text>
+            <Text color={theme.danger}>offline</Text>
+          </Box>
+        )}
+      </Box>
 
-      {footerMessage && (
-        <Text color={theme.accent}>{footerMessage}</Text>
-      )}
+      {footerMessage && <Text color={theme.accent}>{footerMessage}</Text>}
 
       <Box gap={2}>
         <Text color={theme.textMuted}>checked {safeProdLastCheck}</Text>
@@ -57,4 +63,4 @@ export function Footer({ termWidth: _ }: Props) {
       </Box>
     </Box>
   );
-}   
+}

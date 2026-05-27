@@ -12,9 +12,9 @@ export function CommandBar({ termWidth: _ }: Props) {
     setScreen, setFooterMessage,
   } = useAppStore();
 
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions,        setSuggestions]        = useState<string[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
-  const [cursorVisible, setCursorVisible] = useState(true);
+  const [cursorVisible,      setCursorVisible]       = useState(true);
 
   useEffect(() => {
     const t = setInterval(() => setCursorVisible(v => !v), 530);
@@ -32,17 +32,26 @@ export function CommandBar({ termWidth: _ }: Props) {
     setSelectedSuggestion(0);
   }, [inputValue]);
 
+  // Always clamp — fixes ghost highlight bug
+  const safeSelected = Math.min(
+    selectedSuggestion,
+    Math.max(0, suggestions.length - 1),
+  );
+
   useInput((input, key) => {
     if (!inputActive) return;
     if (key.escape)    { setInputActive(false); return; }
     if (key.upArrow)   { setSelectedSuggestion(i => Math.max(0, i - 1)); return; }
-    if (key.downArrow) { setSelectedSuggestion(i => Math.min(suggestions.length - 1, i + 1)); return; }
+    if (key.downArrow) {
+      setSelectedSuggestion(i => Math.min(suggestions.length - 1, i + 1));
+      return;
+    }
     if (key.tab && suggestions.length > 0) {
-      setInputValue(suggestions[selectedSuggestion] ?? inputValue);
+      setInputValue(suggestions[safeSelected] ?? inputValue);
       return;
     }
     if (key.return) {
-      executeCommand(inputValue || (suggestions[selectedSuggestion] ?? ''));
+      executeCommand(inputValue || (suggestions[safeSelected] ?? ''));
       return;
     }
     if (key.backspace || key.delete) { setInputValue(inputValue.slice(0, -1)); return; }
@@ -74,24 +83,36 @@ export function CommandBar({ termWidth: _ }: Props) {
   return (
     <Box flexDirection="column">
       {visibleSuggestions.length > 0 && (
-        <Box flexDirection="column" borderStyle="single" borderColor={theme.panel} paddingX={1} marginX={1}>
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={theme.panel}
+          paddingX={1}
+          marginX={1}
+        >
           {visibleSuggestions.map((cmd, i) => {
-            const isSelected = i === selectedSuggestion;
+            const isSelected = i === safeSelected;
             const screen = SCREENS.find(s => s.cmd === cmd);
-            const desc = screen ? screen.label
+            const desc = (
+              screen             ? screen.label
               : cmd === '/help'  ? 'Show help'
               : cmd === '/quit'  ? 'Exit Zephyr'
-              : cmd === '/clear' ? 'Clear input' : '';
+              : cmd === '/clear' ? 'Clear input'
+              : ''
+            ).padEnd(16);
+
             return (
               <Box key={cmd} paddingX={1}>
                 {isSelected ? (
-                  <Box>
-                    <Text color={theme.bg} backgroundColor={theme.accent}>{` ${cmd.padEnd(14)} `}</Text>
-                    <Text color={theme.textDim}>{'  '}{desc}</Text>
+                  <Box gap={2}>
+                    <Text color={theme.bg} backgroundColor={theme.accent} bold>
+                      {` ${cmd.padEnd(12)} `}
+                    </Text>
+                    <Text color={theme.textDim}>{desc}</Text>
                   </Box>
                 ) : (
-                  <Box>
-                    <Text color={theme.accent}>{cmd.padEnd(16)}</Text>
+                  <Box gap={2}>
+                    <Text color={theme.accent}>{cmd.padEnd(14)}</Text>
                     <Text color={theme.textMuted}>{desc}</Text>
                   </Box>
                 )}
@@ -99,7 +120,9 @@ export function CommandBar({ termWidth: _ }: Props) {
             );
           })}
           {suggestions.length > 8 && (
-            <Text color={theme.textMuted} dimColor>  +{suggestions.length - 8} more…</Text>
+            <Text color={theme.textMuted} dimColor>
+              {'  '}+{suggestions.length - 8} more…
+            </Text>
           )}
         </Box>
       )}
@@ -107,8 +130,10 @@ export function CommandBar({ termWidth: _ }: Props) {
       <Box borderStyle="single" borderColor={theme.accent} paddingX={1}>
         <Text color={theme.accent} bold>{'> '}</Text>
         <Text color={theme.text}>{inputValue}</Text>
-        <Text color={cursorVisible ? theme.cursor : theme.bg}>█</Text>
-        <Text color={theme.textMuted}>{'  ↑↓ select  Tab complete  Enter run  Esc close'}</Text>
+        <Text color={cursorVisible ? theme.cursor : theme.bg}>{'█'}</Text>
+        <Text color={theme.textMuted}>
+          {'  ↑↓ select  Tab complete  Enter run  Esc close'}
+        </Text>
       </Box>
     </Box>
   );
