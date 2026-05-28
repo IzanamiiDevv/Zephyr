@@ -35,8 +35,6 @@ export class GitService {
     this.git = simpleGit({ baseDir: cwd, binary: 'git', maxConcurrentProcesses: 4 });
   }
 
-  // ── Repo detection ──────────────────────────────────────────────────────
-
   async isGitRepo(): Promise<boolean> {
     try {
       await this.git.revparse(['--git-dir']);
@@ -65,7 +63,6 @@ export class GitService {
     };
   }
 
-  // ── Branch operations ───────────────────────────────────────────────────
 
   async getCurrentBranch(): Promise<string> {
     const result = await this.git.revparse(['--abbrev-ref', 'HEAD']);
@@ -112,7 +109,6 @@ export class GitService {
     await this.git.push([remote, '--delete', name]);
   }
 
-  // ── Status & diff ────────────────────────────────────────────────────────
 
   async getStatus(): Promise<StatusResult> {
     return this.git.status();
@@ -127,14 +123,12 @@ export class GitService {
       const [behind = '0', ahead = '0'] = result.trim().split(/\s+/);
       return { ahead: parseInt(ahead, 10), behind: parseInt(behind, 10) };
     } catch {
-      // Remote tracking branch may not exist yet
       return { ahead: 0, behind: 0 };
     }
   }
 
   async hasConflictRisk(targetBranch = 'production'): Promise<boolean> {
     try {
-      // Dry-run merge to detect conflicts without touching working tree
       await this.git.raw(['merge-tree', 'HEAD', targetBranch]);
       const current = await this.getCurrentBranch();
       const base    = await this.git.raw(['merge-base', current, targetBranch]);
@@ -148,7 +142,6 @@ export class GitService {
       const ourFiles  = new Set(diff.trim().split('\n').filter(Boolean));
       const prodFiles = new Set(prodDiff.trim().split('\n').filter(Boolean));
 
-      // If any files overlap, there's potential conflict
       for (const f of ourFiles) {
         if (prodFiles.has(f)) return true;
       }
@@ -158,7 +151,6 @@ export class GitService {
     }
   }
 
-  // ── Commits ──────────────────────────────────────────────────────────────
 
   async getRecentCommits(count = 10): Promise<CommitInfo[]> {
     const log: LogResult = await this.git.log({ maxCount: count });
@@ -186,7 +178,6 @@ export class GitService {
     }
   }
 
-  // ── Remote / safe-production ─────────────────────────────────────────────
 
   async fetchRemote(remote = 'origin'): Promise<void> {
     await this.git.fetch([remote, '--prune']);

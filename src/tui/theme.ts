@@ -22,7 +22,8 @@ export type ScreenId =
   | 'commits'
   | 'staging'
   | 'team'
-  | 'rawgit';
+  | 'rawgit'
+  | 'config';
 
 export const SCREENS: { id: ScreenId; label: string; cmd: string }[] = [
   { id: 'home',     label: 'Home',     cmd: '/home'     },
@@ -32,6 +33,7 @@ export const SCREENS: { id: ScreenId; label: string; cmd: string }[] = [
   { id: 'staging',  label: 'Staging',  cmd: '/staging'  },
   { id: 'team',     label: 'Team',     cmd: '/team'     },
   { id: 'rawgit',   label: 'Raw Git',  cmd: '/git'      },
+  { id: 'config',   label: 'Config',   cmd: '/config'   },
 ];
 
 export const COMMANDS = SCREENS.map(s => s.cmd).concat([

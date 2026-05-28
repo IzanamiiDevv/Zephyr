@@ -36,7 +36,6 @@ export function validateNewBranchName(name: string): ValidationResult {
     return { valid: false, errors, warnings };
   }
 
-  // Dev branch validations
   if (parsed.kind === 'dev') {
     if (!BRANCH_TYPES.includes(parsed.type as BranchType)) {
       errors.push(`Invalid type "${parsed.type}". Must be one of: ${BRANCH_TYPES.join(', ')}`);

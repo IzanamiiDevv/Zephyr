@@ -32,7 +32,6 @@ export function CommandBar({ termWidth: _ }: Props) {
     setSelectedSuggestion(0);
   }, [inputValue]);
 
-  // Always clamp — fixes ghost highlight bug
   const safeSelected = Math.min(
     selectedSuggestion,
     Math.max(0, suggestions.length - 1),

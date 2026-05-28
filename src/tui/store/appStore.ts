@@ -4,6 +4,7 @@ import type { GitService, BranchInfo } from '../../git/GitService.js';
 import type { PresenceMap } from '../../git/TeamService.js';
 import type { NetworkStatus } from '../../git/NetworkMonitor.js';
 import type { CoreBranch } from '../../git/BranchChecker.js';
+import type { ZephyrConfigData } from '../../git/ZephyrConfig.js';
 
 export type SafeProdStatus = 'synced' | 'behind' | 'checking' | 'error';
 
@@ -27,18 +28,22 @@ export interface StagingFile {
   staged:     boolean;
 }
 
+const DEFAULT_CONFIG: ZephyrConfigData = {
+  lock: false, ownerEmail: '', contributors: [], version: '1.0.0',
+};
+
 export interface AppState {
   // Navigation
-  activeScreen:  ScreenId;
-  setScreen:     (s: ScreenId) => void;
+  activeScreen: ScreenId;
+  setScreen:    (s: ScreenId) => void;
 
-  // Command input
+  // Input
   inputActive:    boolean;
   inputValue:     string;
   setInputActive: (v: boolean) => void;
   setInputValue:  (v: string) => void;
 
-  // Safe-production watcher
+  // Safe-prod
   safeProdStatus:    SafeProdStatus;
   safeProdLastCheck: string;
   setSafeProdStatus: (s: SafeProdStatus) => void;
@@ -47,7 +52,7 @@ export interface AppState {
   networkStatus:    NetworkStatus;
   setNetworkStatus: (s: NetworkStatus) => void;
 
-  // Repo context
+  // Repo
   isGitRepo:      boolean;
   repoError:      string | null;
   repoName:       string;
@@ -56,6 +61,16 @@ export interface AppState {
   setRepoContext: (name: string, branch: string) => void;
   setGitService:  (git: GitService | null) => void;
   setRepoError:   (err: string | null) => void;
+
+  // Session identity
+  userEmail:       string;
+  userName:        string;
+  isOwner:         boolean;
+  setUserIdentity: (name: string, email: string, owner: boolean) => void;
+
+  // Zephyr config
+  zephyrConfig:    ZephyrConfigData;
+  setZephyrConfig: (c: ZephyrConfigData) => void;
 
   // Branch checker
   missingBranches:    CoreBranch[];
@@ -81,11 +96,11 @@ export interface AppState {
   setStagingFiles: (f: StagingFile[]) => void;
   refreshStaging:  () => Promise<void>;
 
-  // Team presence
+  // Team
   teamPresence:    PresenceMap;
   setTeamPresence: (m: PresenceMap) => void;
 
-  // Footer message
+  // Footer
   footerMessage:    string | null;
   setFooterMessage: (msg: string | null) => void;
 }
@@ -126,6 +141,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ repoName: name, currentBranch: branch, isGitRepo: true, repoError: null }),
   setGitService: (git) => set({ gitService: git }),
   setRepoError:  (err) => set({ repoError: err, isGitRepo: err === null }),
+
+  // Session identity
+  userEmail:  '',
+  userName:   '',
+  isOwner:    false,
+  setUserIdentity: (name, email, owner) =>
+    set({ userName: name, userEmail: email, isOwner: owner }),
+
+  // Config
+  zephyrConfig:    DEFAULT_CONFIG,
+  setZephyrConfig: (c) => set({ zephyrConfig: c }),
 
   // Branch checker
   missingBranches:    [],
