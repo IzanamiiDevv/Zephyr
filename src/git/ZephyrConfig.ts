@@ -10,14 +10,19 @@ export interface Contributor {
 }
 
 export interface ZephyrConfigData {
-  lock:         boolean;
-  ownerEmail:   string;
-  contributors: Contributor[];
   version:      string;
+  lock:         boolean;
+  strict:       boolean;   // when true, CI/CD Guardian enforces all policies
+  owners:       string[];
+  contributors: Contributor[];
 }
 
 const DEFAULT_CONFIG: ZephyrConfigData = {
-  lock: false, ownerEmail: '', contributors: [], version: '1.0.0',
+  version:      '1.0.0',
+  lock:         false,
+  strict:       false,
+  owners:       [],
+  contributors: [],
 };
 
 export function configPath(repoRoot: string)   { return join(repoRoot, 'zephyr.json'); }
@@ -29,16 +34,35 @@ export function readConfig(repoRoot: string): ZephyrConfigData {
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<ZephyrConfigData>;
     return {
-      lock:         parsed.lock         ?? false,
-      ownerEmail:   parsed.ownerEmail   ?? '',
-      contributors: parsed.contributors ?? [],
       version:      parsed.version      ?? '1.0.0',
+      lock:         parsed.lock         ?? false,
+      strict:       parsed.strict       ?? false,
+      owners:       parsed.owners       ?? [],
+      contributors: parsed.contributors ?? [],
     };
   } catch { return { ...DEFAULT_CONFIG }; }
 }
 
 export function writeConfig(repoRoot: string, data: ZephyrConfigData): void {
   writeFileSync(configPath(repoRoot), JSON.stringify(data, null, 2), 'utf8');
+}
+
+export function isOwner(config: ZephyrConfigData, gitUserName: string): boolean {
+  if (!config.owners || config.owners.length === 0) return true;
+  return config.owners.some(o => o.toLowerCase() === gitUserName.toLowerCase());
+}
+
+export function addOwner(config: ZephyrConfigData, username: string): ZephyrConfigData {
+  const already = config.owners.some(o => o.toLowerCase() === username.toLowerCase());
+  if (already) return config;
+  return { ...config, owners: [...config.owners, username] };
+}
+
+export function removeOwner(config: ZephyrConfigData, username: string): ZephyrConfigData {
+  return {
+    ...config,
+    owners: config.owners.filter(o => o.toLowerCase() !== username.toLowerCase()),
+  };
 }
 
 export function hashPrivateKey(privateKey: string): string {
@@ -50,9 +74,9 @@ export function verifyKey(privateKey: string, publicKey: string): boolean {
 }
 
 export function addContributor(
-  config: ZephyrConfigData,
+  config:      ZephyrConfigData,
   contributor: Omit<Contributor, 'publicKey'>,
-  privateKey: string,
+  privateKey:  string,
 ): ZephyrConfigData {
   const publicKey = hashPrivateKey(privateKey);
   const existing  = config.contributors.filter(c => c.email !== contributor.email);
@@ -63,20 +87,18 @@ export function removeContributor(config: ZephyrConfigData, email: string): Zeph
   return { ...config, contributors: config.contributors.filter(c => c.email !== email) };
 }
 
-export function authenticateContributor(
-  config: ZephyrConfigData, email: string, privateKey: string,
+export function verifyContributorKey(
+  config:     ZephyrConfigData,
+  email:      string,
+  privateKey: string,
 ): Contributor | null {
   const c = config.contributors.find(c => c.email === email);
   if (!c || !verifyKey(privateKey, c.publicKey)) return null;
   return c;
 }
 
-export function isOwner(config: ZephyrConfigData, email: string): boolean {
-  return !!config.ownerEmail && config.ownerEmail.trim() === email.trim();
-}
-
-export function requiresKeyAuth(config: ZephyrConfigData, userEmail: string): boolean {
+export function requiresKeyAuth(config: ZephyrConfigData, gitUserName: string): boolean {
   if (config.contributors.length === 0) return false;
-  if (isOwner(config, userEmail)) return false;
+  if (isOwner(config, gitUserName)) return false;
   return true;
 }

@@ -86,7 +86,6 @@ export function App() {
 
   const continueInitRef = useRef<((account: GitAccount | null) => Promise<void>) | null>(null);
 
-  // ── Resize ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!stdout) return;
     const onResize = () => {
@@ -97,7 +96,6 @@ export function App() {
     return () => { stdout.off('resize', onResize); };
   }, [stdout]);
 
-  // ── Bootstrap ────────────────────────────────────────────────────────────
   useEffect(() => {
     let safeProdWatcher: SafeProdWatcher | null = null;
     let networkMonitor:  NetworkMonitor  | null = null;
@@ -118,34 +116,37 @@ export function App() {
       setGitService(result.git);
       setRepoContext(result.repoName, result.currentBranch);
 
+      // Resolve git identity
+      let gitName  = '';
+      let gitEmail = '';
+      try {
+        gitName  = (await (result.git as any).git.raw(['config', 'user.name'])).trim();
+        gitEmail = (await (result.git as any).git.raw(['config', 'user.email'])).trim();
+      } catch { /* ignore */ }
+
+      const finalName  = gitName  || account?.name  || '';
+      const finalEmail = gitEmail || account?.email || '';
+
       // Load / init zephyr config
       const config = readConfig(cwd);
       if (!configExists(cwd)) writeConfig(cwd, config);
       setZephyrConfig(config);
 
-      // Resolve identity
-      let gitEmail = '';
-      let gitName  = '';
-      try {
-        gitEmail = (await (result.git as any).git.raw(['config', 'user.email'])).trim();
-        gitName  = (await (result.git as any).git.raw(['config', 'user.name'])).trim();
-      } catch { /* ignore */ }
-      const finalEmail = gitEmail || account?.email || '';
-      const finalName  = gitName  || account?.name  || '';
-      const owner      = checkIsOwner(config, finalEmail);
+      // Ownership: match git user.name against owners[]
+      // If owners[] is empty everyone is owner
+      const owner = checkIsOwner(config, finalName);
       setUserIdentity(finalName, finalEmail, owner);
 
-      // Lock check — owner bypasses
+      // Lock check — owners bypass
       if (config.lock && !owner) { setPhase('locked'); return; }
 
-      // Key auth check
-      if (requiresKeyAuth(config, finalEmail)) {
+      // Key auth — owners bypass
+      if (requiresKeyAuth(config, finalName)) {
         await Promise.all([refreshBranches(), refreshStatus()]);
         setPhase('key-entry');
         return;
       }
 
-      // Load data
       await Promise.all([refreshBranches(), refreshStatus()]);
 
       // Branch checker
@@ -154,7 +155,7 @@ export function App() {
         setMissingBranches(check.missing);
         setBranchCheckProps({
           missing:  check.missing,
-          isOwner:  check.isOwner,
+          isOwner:  owner,
           repoSlug: check.repoSlug,
         });
         setPhase('branch-check');
@@ -216,7 +217,6 @@ export function App() {
     };
   }, []);
 
-  // ── Global keybinds ──────────────────────────────────────────────────────
   useInput((input, key) => {
     if (phase === 'locked') return;
     if (input === '/' && !inputActive) {
@@ -228,8 +228,6 @@ export function App() {
       exit();
     }
   });
-
-  // ── Phases ────────────────────────────────────────────────────────────────
 
   if (phase === 'booting') {
     return (
@@ -257,16 +255,16 @@ export function App() {
   }
 
   if (phase === 'locked') {
-    return (
-      <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
-        <Header termWidth={termSize.columns} />
-        <Box flexGrow={1} flexDirection="column" overflow="hidden" justifyContent="center">
-          <LockedScreen />
-        </Box>
-        <Footer termWidth={termSize.columns} />
+  return (
+    <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
+      <Header termWidth={termSize.columns} />
+      <Box flexGrow={1} flexDirection="column" overflow="hidden" justifyContent="center">
+        <LockedScreen onUnlock={() => setPhase('ready')} />
       </Box>
-    );
-  }
+      <Footer termWidth={termSize.columns} />
+    </Box>
+  );
+}
 
   if (phase === 'key-entry') {
     return (

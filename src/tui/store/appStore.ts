@@ -29,7 +29,11 @@ export interface StagingFile {
 }
 
 const DEFAULT_CONFIG: ZephyrConfigData = {
-  lock: false, ownerEmail: '', contributors: [], version: '1.0.0',
+  version:      '1.0.0',
+  lock:         false,
+  strict:       false,
+  owners:       [],
+  contributors: [],
 };
 
 export interface AppState {
@@ -106,17 +110,14 @@ export interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  // Navigation
   activeScreen: 'home',
   setScreen:    (s) => set({ activeScreen: s }),
 
-  // Input
   inputActive:    false,
   inputValue:     '',
   setInputActive: (v) => set({ inputActive: v, inputValue: '' }),
   setInputValue:  (v) => set({ inputValue: v }),
 
-  // Safe-prod
   safeProdStatus:    'checking',
   safeProdLastCheck: '--:--',
   setSafeProdStatus: (s) =>
@@ -127,11 +128,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     }),
 
-  // Network
   networkStatus:    'checking',
   setNetworkStatus: (s) => set({ networkStatus: s }),
 
-  // Repo
   isGitRepo:      true,
   repoError:      null,
   repoName:       '',
@@ -142,24 +141,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGitService: (git) => set({ gitService: git }),
   setRepoError:  (err) => set({ repoError: err, isGitRepo: err === null }),
 
-  // Session identity
   userEmail:  '',
   userName:   '',
   isOwner:    false,
   setUserIdentity: (name, email, owner) =>
     set({ userName: name, userEmail: email, isOwner: owner }),
 
-  // Config
   zephyrConfig:    DEFAULT_CONFIG,
   setZephyrConfig: (c) => set({ zephyrConfig: c }),
 
-  // Branch checker
   missingBranches:    [],
   branchCheckDone:    false,
   setMissingBranches: (b) => set({ missingBranches: b }),
   setBranchCheckDone: (v) => set({ branchCheckDone: v }),
 
-  // Branch list
   localBranches:    [],
   setLocalBranches: (b) => set({ localBranches: b }),
   refreshBranches: async () => {
@@ -171,7 +166,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { /* ignore */ }
   },
 
-  // Branch status
   branchStatus:     null,
   statusLoading:    false,
   setBranchStatus:  (s) => set({ branchStatus: s }),
@@ -189,7 +183,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Staging
   stagingFiles:    [],
   stagingLoading:  false,
   setStagingFiles: (f) => set({ stagingFiles: f }),
@@ -211,11 +204,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Team
   teamPresence:    {},
   setTeamPresence: (m) => set({ teamPresence: m }),
 
-  // Footer
   footerMessage:    null,
   setFooterMessage: (msg) => set({ footerMessage: msg }),
 }));

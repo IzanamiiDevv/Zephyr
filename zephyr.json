@@ -1,6 +1,7 @@
 {
-  "lock": false,
-  "ownerEmail": "",
-  "contributors": [],
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "lock": true,
+  "strict": false,
+  "owners": [],
+  "contributors": []
 }
