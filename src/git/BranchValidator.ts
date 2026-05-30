@@ -1,8 +1,8 @@
 import { parseBranch, BRANCH_TYPES, type BranchType } from './BranchParser.js';
 
 export interface ValidationResult {
-  valid:   boolean;
-  errors:  string[];
+  valid:    boolean;
+  errors:   string[];
   warnings: string[];
 }
 
@@ -30,7 +30,8 @@ export function validateNewBranchName(name: string): ValidationResult {
   if (parsed.kind === 'unknown') {
     errors.push(
       `Branch name does not follow Zephyr convention.\n` +
-      `Expected: production/<type>/<scope>/<name>\n` +
+      `Expected: prod-<type>/<scope>/<name>\n` +
+      `Example:  prod-feat/auth/login-page\n` +
       `Types: ${BRANCH_TYPES.join(', ')}`
     );
     return { valid: false, errors, warnings };
@@ -58,7 +59,7 @@ export function validateNewBranchName(name: string): ValidationResult {
 }
 
 export function validateSourceBranch(
-  sourceBranch: string,
+  sourceBranch:    string,
   requireApproval = false,
 ): ValidationResult {
   const errors:   string[] = [];
@@ -72,11 +73,11 @@ export function validateSourceBranch(
     if (!requireApproval) {
       errors.push(
         'Branching from "production" requires explicit approval.\n' +
-        'Pass --from-production flag or confirm in the prompt.'
+        'Confirm in the prompt to proceed.'
       );
       return { valid: false, errors, warnings };
     }
-    warnings.push('Branching from "production" directly. Ensure safe-production is up to date.');
+    warnings.push('Branching from "production" directly.');
     return { valid: true, errors, warnings };
   }
 
@@ -84,7 +85,7 @@ export function validateSourceBranch(
   if (parsed.kind === 'dev') {
     if (!requireApproval) {
       errors.push(
-        `Branching from a dev branch "${sourceBranch}" requires explicit approval.\n` +
+        `Branching from dev branch "${sourceBranch}" requires explicit approval.\n` +
         'This creates a sub-branch (copyof). Confirm in the prompt to proceed.'
       );
       return { valid: false, errors, warnings };
@@ -103,7 +104,7 @@ export function validateSourceBranch(
 }
 
 export function validateCommitMessage(
-  message: string,
+  message:        string,
   expectedPrefix: string | null,
 ): ValidationResult {
   const errors:   string[] = [];
@@ -128,7 +129,7 @@ export function validateCommitMessage(
       return { valid: false, errors, warnings };
     }
     if (body.length > 72) {
-      warnings.push('Commit subject is longer than 72 characters. Consider shortening.');
+      warnings.push('Commit subject is over 72 characters. Consider shortening.');
     }
   }
 

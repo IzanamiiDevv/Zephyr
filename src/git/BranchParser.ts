@@ -11,19 +11,19 @@ export type CoreBranch =
   | 'release';
 
 export interface ParsedDevBranch {
-  kind:      'dev';
-  type:      BranchType;
-  scope:     string;
-  name:      string;
-  isCopy:    boolean;
-  copyOf?:   string;
-  raw:       string;
+  kind:    'dev';
+  type:    BranchType;
+  scope:   string;
+  name:    string;
+  isCopy:  boolean;
+  copyOf?: string;
+  raw:     string;
 }
 
 export interface ParsedCoreBranch {
-  kind:   'core';
-  name:   CoreBranch | string;
-  raw:    string;
+  kind: 'core';
+  name: CoreBranch | string;
+  raw:  string;
 }
 
 export interface ParsedReleaseBranch {
@@ -43,58 +43,77 @@ export type ParsedBranch =
   | ParsedReleaseBranch
   | ParsedUnknownBranch;
 
+/**
+ * Parse any branch name into a structured object.
+ *
+ * Patterns:
+ *   prod-<type>/<scope>/<name>
+ *   prod-<type>/<scope>/copyof/<name>
+ *   release/<version>
+ *   main | production | safe-production
+ */
 export function parseBranch(raw: string): ParsedBranch {
   const name = raw.trim();
 
+  // Core branches
   if (['main', 'production', 'safe-production'].includes(name)) {
     return { kind: 'core', name: name as CoreBranch, raw };
   }
 
+  // Release branches
   if (name.startsWith('release/')) {
     const version = name.slice('release/'.length);
     return { kind: 'release', version, raw };
   }
 
-  if (name.startsWith('production/')) {
-    const parts = name.split('/');
-    if (parts.length >= 4) {
-      const type  = parts[1] as BranchType;
-      const scope = parts[2] as string;
+  // Dev branches: prod-<type>/<scope>/[copyof/]<name>
+  const DEV_PREFIX = /^prod-([a-z]+)\/([^/]+)\/(.+)$/;
+  const match = name.match(DEV_PREFIX);
 
-      if (!BRANCH_TYPES.includes(type)) {
-        return { kind: 'unknown', raw };
-      }
+  if (match) {
+    const type  = match[1] as BranchType;
+    const scope = match[2] as string;
+    const rest  = match[3] as string;
 
-      if (parts[3] === 'copyof' && parts[4]) {
-        return {
-          kind:    'dev',
-          type,
-          scope,
-          name:    parts.slice(4).join('/'),
-          isCopy:  true,
-          copyOf:  `production/${type}/${scope}/${parts.slice(4).join('/')}`,
-          raw,
-        };
-      }
+    if (!BRANCH_TYPES.includes(type)) {
+      return { kind: 'unknown', raw };
+    }
 
+    // copyof pattern: prod-<type>/<scope>/copyof/<name>
+    if (rest.startsWith('copyof/')) {
+      const copyName = rest.slice('copyof/'.length);
       return {
         kind:   'dev',
         type,
         scope,
-        name:   parts.slice(3).join('/'),
-        isCopy: false,
+        name:   copyName,
+        isCopy: true,
+        copyOf: `prod-${type}/${scope}/${copyName}`,
         raw,
       };
     }
+
+    return {
+      kind:   'dev',
+      type,
+      scope,
+      name:   rest,
+      isCopy: false,
+      raw,
+    };
   }
 
   return { kind: 'unknown', raw };
 }
 
+/**
+ * Build a branch name string from parts.
+ * Format: prod-<type>/<scope>/<name>
+ */
 export function buildBranchName(
-  type: BranchType,
-  scope: string,
-  name: string,
+  type:   BranchType,
+  scope:  string,
+  name:   string,
   copyOf?: string,
 ): string {
   const safeName  = slugify(name);
@@ -103,13 +122,16 @@ export function buildBranchName(
   if (copyOf) {
     const parsed = parseBranch(copyOf);
     if (parsed.kind === 'dev') {
-      return `production/${parsed.type}/${parsed.scope}/copyof/${parsed.name}`;
+      return `prod-${parsed.type}/${parsed.scope}/copyof/${parsed.name}`;
     }
   }
 
-  return `production/${type}/${safeScope}/${safeName}`;
+  return `prod-${type}/${safeScope}/${safeName}`;
 }
 
+/**
+ * Convert a human label into a branch-safe slug.
+ */
 export function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -120,6 +142,10 @@ export function slugify(input: string): string {
     .replace(/^-|-$/g, '');
 }
 
+/**
+ * Return the conventional commit prefix from a parsed dev branch.
+ * e.g.  feat(auth):
+ */
 export function commitPrefix(branch: ParsedBranch): string | null {
   if (branch.kind !== 'dev') return null;
   return `${branch.type}(${branch.scope}):`;
