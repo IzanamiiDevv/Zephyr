@@ -18,21 +18,18 @@ export async function detectGitAccounts(repoRoot: string): Promise<GitAccount[]>
     if (!seen.has(key) && a.email) { seen.add(key); accounts.push(a); }
   };
 
-  // Local repo config
   try {
     const name  = execSync('git config --local user.name',  { cwd: repoRoot, stdio: ['pipe','pipe','pipe'] }).toString().trim();
     const email = execSync('git config --local user.email', { cwd: repoRoot, stdio: ['pipe','pipe','pipe'] }).toString().trim();
     if (name || email) add({ name, email, source: 'local' });
   } catch { /* no local config */ }
 
-  // Global gitconfig
   try {
     const name  = execSync('git config --global user.name',  { stdio: ['pipe','pipe','pipe'] }).toString().trim();
     const email = execSync('git config --global user.email', { stdio: ['pipe','pipe','pipe'] }).toString().trim();
     if (name || email) add({ name, email, source: 'global' });
   } catch { /* no global config */ }
 
-  // includeIf blocks in ~/.gitconfig
   try {
     const gitconfigPath = join(homedir(), '.gitconfig');
     if (existsSync(gitconfigPath)) {
@@ -54,7 +51,6 @@ export async function detectGitAccounts(repoRoot: string): Promise<GitAccount[]>
     }
   } catch { /* skip */ }
 
-  // SSH config host aliases
   try {
     const sshConfigPath = join(homedir(), '.ssh', 'config');
     if (existsSync(sshConfigPath)) {
