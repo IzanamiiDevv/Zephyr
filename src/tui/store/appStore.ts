@@ -66,15 +66,19 @@ export interface AppState {
   setGitService:  (git: GitService | null) => void;
   setRepoError:   (err: string | null) => void;
 
-  // Session identity
-  userEmail:       string;
-  userName:        string;
-  isOwner:         boolean;
-  setUserIdentity: (name: string, email: string, owner: boolean) => void;
+  // Identity
+  userEmail:          string;
+  userName:           string;
+  isOwner:            boolean;
+  firstCommitAuthor:  string;
+  setUserIdentity:    (name: string, email: string, owner: boolean) => void;
+  setFirstCommitAuthor: (author: string) => void;
 
   // Zephyr config
   zephyrConfig:    ZephyrConfigData;
   setZephyrConfig: (c: ZephyrConfigData) => void;
+  isFirstRun:      boolean;
+  setIsFirstRun:   (v: boolean) => void;
 
   // Branch checker
   missingBranches:    CoreBranch[];
@@ -110,14 +114,17 @@ export interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  // Navigation
   activeScreen: 'home',
   setScreen:    (s) => set({ activeScreen: s }),
 
+  // Input
   inputActive:    false,
   inputValue:     '',
   setInputActive: (v) => set({ inputActive: v, inputValue: '' }),
   setInputValue:  (v) => set({ inputValue: v }),
 
+  // Safe-prod
   safeProdStatus:    'checking',
   safeProdLastCheck: '--:--',
   setSafeProdStatus: (s) =>
@@ -128,9 +135,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     }),
 
+  // Network
   networkStatus:    'checking',
   setNetworkStatus: (s) => set({ networkStatus: s }),
 
+  // Repo
   isGitRepo:      true,
   repoError:      null,
   repoName:       '',
@@ -141,20 +150,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGitService: (git) => set({ gitService: git }),
   setRepoError:  (err) => set({ repoError: err, isGitRepo: err === null }),
 
-  userEmail:  '',
-  userName:   '',
-  isOwner:    false,
-  setUserIdentity: (name, email, owner) =>
+  // Identity
+  userEmail:           '',
+  userName:            '',
+  isOwner:             false,
+  firstCommitAuthor:   '',
+  setUserIdentity:     (name, email, owner) =>
     set({ userName: name, userEmail: email, isOwner: owner }),
+  setFirstCommitAuthor: (author) => set({ firstCommitAuthor: author }),
 
+  // Config
   zephyrConfig:    DEFAULT_CONFIG,
   setZephyrConfig: (c) => set({ zephyrConfig: c }),
+  isFirstRun:      false,
+  setIsFirstRun:   (v) => set({ isFirstRun: v }),
 
+  // Branch checker
   missingBranches:    [],
   branchCheckDone:    false,
   setMissingBranches: (b) => set({ missingBranches: b }),
   setBranchCheckDone: (v) => set({ branchCheckDone: v }),
 
+  // Branch list
   localBranches:    [],
   setLocalBranches: (b) => set({ localBranches: b }),
   refreshBranches: async () => {
@@ -166,6 +183,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch { /* ignore */ }
   },
 
+  // Branch status
   branchStatus:     null,
   statusLoading:    false,
   setBranchStatus:  (s) => set({ branchStatus: s }),
@@ -183,6 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // Staging
   stagingFiles:    [],
   stagingLoading:  false,
   setStagingFiles: (f) => set({ stagingFiles: f }),
@@ -204,9 +223,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // Team
   teamPresence:    {},
   setTeamPresence: (m) => set({ teamPresence: m }),
 
+  // Footer
   footerMessage:    null,
   setFooterMessage: (msg) => set({ footerMessage: msg }),
 }));

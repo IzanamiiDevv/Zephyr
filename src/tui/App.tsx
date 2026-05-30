@@ -17,6 +17,7 @@ import { BranchCheckScreen }   from './screens/BranchCheckScreen.js';
 import { LockedScreen }        from './screens/LockedScreen.js';
 import { KeyEntryScreen }      from './screens/KeyEntryScreen.js';
 import { AccountSelectScreen } from './screens/AccountSelectScreen.js';
+import { InitScreen }          from './screens/InitScreen.js';
 import { useAppStore }         from './store/appStore.js';
 import { bootstrapRepo }       from '../git/RepoBootstrap.js';
 import { SafeProdWatcher }     from '../git/SafeProdWatcher.js';
@@ -30,19 +31,21 @@ import {
   type GitAccount,
 } from '../git/AccountDetector.js';
 import {
-  readConfig,
   configExists,
-  writeConfig,
   isOwner as checkIsOwner,
   requiresKeyAuth,
 } from '../git/ZephyrConfig.js';
+import { readConfig, writeConfig } from '../git/ZephyrConfig.js';
 
+// ── Boot phases ────────────────────────────────────────────────────────────
 type AppPhase =
   | 'booting'
-  | 'account-select'
-  | 'branch-check'
-  | 'locked'
-  | 'key-entry'
+  | 'account-select'   // multiple git accounts
+  | 'init'             // no zephyr.json + user is owner
+  | 'not-initialized'  // no zephyr.json + user is NOT owner → LockedScreen
+  | 'locked'           // zephyr.json lock: true
+  | 'key-entry'        // contributors defined
+  | 'branch-check'     // missing core branches
   | 'ready';
 
 function ScreenRouter() {
@@ -71,7 +74,8 @@ export function App() {
     setNetworkStatus, setTeamPresence,
     setMissingBranches, setBranchCheckDone,
     setZephyrConfig, setUserIdentity,
-    isGitRepo, zephyrConfig, userEmail,
+    setFirstCommitAuthor, setIsFirstRun,
+    isGitRepo, zephyrConfig, userEmail, isOwner,
   } = useAppStore();
 
   const [termSize, setTermSize] = useState({
@@ -86,6 +90,7 @@ export function App() {
 
   const continueInitRef = useRef<((account: GitAccount | null) => Promise<void>) | null>(null);
 
+  // ── Resize ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!stdout) return;
     const onResize = () => {
@@ -96,6 +101,7 @@ export function App() {
     return () => { stdout.off('resize', onResize); };
   }, [stdout]);
 
+  // ── Bootstrap ────────────────────────────────────────────────────────────
   useEffect(() => {
     let safeProdWatcher: SafeProdWatcher | null = null;
     let networkMonitor:  NetworkMonitor  | null = null;
@@ -105,6 +111,7 @@ export function App() {
     async function continueInit(account: GitAccount | null) {
       if (account) applyAccountToRepo(cwd, account);
 
+      // ── 1. Bootstrap repo ──────────────────────────────────────────
       const result = await bootstrapRepo(cwd);
       if (!result.ok || !result.git) {
         setRepoError(result.error);
@@ -115,8 +122,9 @@ export function App() {
 
       setGitService(result.git);
       setRepoContext(result.repoName, result.currentBranch);
+      setFirstCommitAuthor(result.firstCommitAuthor);
 
-      // Resolve git identity
+      // ── 2. Resolve git identity ────────────────────────────────────
       let gitName  = '';
       let gitEmail = '';
       try {
@@ -127,29 +135,50 @@ export function App() {
       const finalName  = gitName  || account?.name  || '';
       const finalEmail = gitEmail || account?.email || '';
 
-      // Load / init zephyr config
+      // ── 3. Check zephyr.json exists ────────────────────────────────
+      const hasConfig = configExists(cwd);
+
+      if (!hasConfig) {
+        // No zephyr.json yet
+        // Owner = first commit author
+        const owner = result.firstCommitAuthor
+          ? result.firstCommitAuthor.toLowerCase() === finalName.toLowerCase()
+          : false;
+
+        setUserIdentity(finalName, finalEmail, owner);
+
+        if (owner) {
+          // Owner sees InitScreen
+          setIsFirstRun(true);
+          setPhase('init');
+        } else {
+          // Non-owner sees locked screen
+          setPhase('not-initialized');
+        }
+        return;
+      }
+
+      // ── 4. Load zephyr config ──────────────────────────────────────
       const config = readConfig(cwd);
-      if (!configExists(cwd)) writeConfig(cwd, config);
       setZephyrConfig(config);
 
-      // Ownership: match git user.name against owners[]
-      // If owners[] is empty everyone is owner
-      const owner = checkIsOwner(config, finalName);
+      const owner = checkIsOwner(config, finalName, result.firstCommitAuthor);
       setUserIdentity(finalName, finalEmail, owner);
 
-      // Lock check — owners bypass
+      // ── 5. Lock check ──────────────────────────────────────────────
       if (config.lock && !owner) { setPhase('locked'); return; }
 
-      // Key auth — owners bypass
-      if (requiresKeyAuth(config, finalName)) {
+      // ── 6. Key auth check ──────────────────────────────────────────
+      if (requiresKeyAuth(config, finalName, result.firstCommitAuthor)) {
         await Promise.all([refreshBranches(), refreshStatus()]);
         setPhase('key-entry');
         return;
       }
 
+      // ── 7. Load data ───────────────────────────────────────────────
       await Promise.all([refreshBranches(), refreshStatus()]);
 
-      // Branch checker
+      // ── 8. Branch checker ──────────────────────────────────────────
       const check = await checkCoreBranches(result.git);
       if (!check.allPresent) {
         setMissingBranches(check.missing);
@@ -164,7 +193,7 @@ export function App() {
         setPhase('ready');
       }
 
-      // Background services
+      // ── 9. Background services ─────────────────────────────────────
       safeProdWatcher = new SafeProdWatcher(
         result.git, s => setSafeProdStatus(s), 60_000,
       );
@@ -197,7 +226,7 @@ export function App() {
       networkMonitor = new NetworkMonitor(s => setNetworkStatus(s), 15_000);
       networkMonitor.start();
 
-      const detectedAccounts = await detectGitAccounts(cwd);
+      const detectedAccounts = await detectGitAccounts(process.cwd());
       if (detectedAccounts.length > 1) {
         setAccounts(detectedAccounts);
         setPhase('account-select');
@@ -217,8 +246,20 @@ export function App() {
     };
   }, []);
 
+  // After init screen completes, re-run from step 4
+  async function afterInit() {
+    setIsFirstRun(false);
+    const cwd    = process.cwd();
+    const config = readConfig(cwd);
+    setZephyrConfig(config);
+    await Promise.all([refreshBranches(), refreshStatus()]);
+    setBranchCheckDone(true);
+    setPhase('ready');
+  }
+
+  // ── Global keybinds ──────────────────────────────────────────────────────
   useInput((input, key) => {
-    if (phase === 'locked') return;
+    if (phase === 'locked' || phase === 'not-initialized') return;
     if (input === '/' && !inputActive) {
       setInputActive(true);
       setInputValue('/');
@@ -229,16 +270,18 @@ export function App() {
     }
   });
 
+  // ── Booting ────────────────────────────────────────────────────────────
   if (phase === 'booting') {
     return (
       <Box flexDirection="column" height={termSize.rows} width={termSize.columns}
         justifyContent="center" alignItems="center" gap={1}>
-        <Text color="#408A71">Initializing Zephyr…</Text>
-        <Text color="#3D7A63" dimColor>Detecting repository and accounts</Text>
+        <Text color="#408A71" bold>Initializing Zephyr…</Text>
+        <Text color="#3D7A63" dimColor>Detecting repository and identity</Text>
       </Box>
     );
   }
 
+  // ── Account select ─────────────────────────────────────────────────────
   if (phase === 'account-select') {
     return (
       <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
@@ -254,18 +297,54 @@ export function App() {
     );
   }
 
-  if (phase === 'locked') {
-  return (
-    <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
-      <Header termWidth={termSize.columns} />
-      <Box flexGrow={1} flexDirection="column" overflow="hidden" justifyContent="center">
-        <LockedScreen onUnlock={() => setPhase('ready')} />
+  // ── First run — owner init ─────────────────────────────────────────────
+  if (phase === 'init') {
+    return (
+      <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
+        <Header termWidth={termSize.columns} />
+        <Box flexGrow={1} flexDirection="column" overflow="hidden">
+          <InitScreen onDone={afterInit} />
+        </Box>
+        <Footer termWidth={termSize.columns} />
       </Box>
-      <Footer termWidth={termSize.columns} />
-    </Box>
-  );
-}
+    );
+  }
 
+  // ── Not initialized — non-owner locked ────────────────────────────────
+  if (phase === 'not-initialized') {
+    return (
+      <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
+        <Header termWidth={termSize.columns} />
+        <Box flexGrow={1} flexDirection="column" overflow="hidden" justifyContent="center">
+          <LockedScreen
+            reason="This repository has not been initialized with Zephyr yet."
+            hint="Contact the repository owner to initialize Zephyr."
+            onUnlock={() => {}} // non-owner cannot unlock
+          />
+        </Box>
+        <Footer termWidth={termSize.columns} />
+      </Box>
+    );
+  }
+
+  // ── Locked ────────────────────────────────────────────────────────────
+  if (phase === 'locked') {
+    return (
+      <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
+        <Header termWidth={termSize.columns} />
+        <Box flexGrow={1} flexDirection="column" overflow="hidden" justifyContent="center">
+          <LockedScreen
+            reason="This repository has been locked by the owner."
+            hint="Contact the repository owner to unlock."
+            onUnlock={() => setPhase('ready')}
+          />
+        </Box>
+        <Footer termWidth={termSize.columns} />
+      </Box>
+    );
+  }
+
+  // ── Key entry ─────────────────────────────────────────────────────────
   if (phase === 'key-entry') {
     return (
       <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
@@ -283,6 +362,7 @@ export function App() {
     );
   }
 
+  // ── Branch check ──────────────────────────────────────────────────────
   if (phase === 'branch-check' && branchCheckProps) {
     return (
       <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
@@ -300,6 +380,7 @@ export function App() {
     );
   }
 
+  // ── Ready ─────────────────────────────────────────────────────────────
   return (
     <Box flexDirection="column" height={termSize.rows} width={termSize.columns}>
       <Header     termWidth={termSize.columns} />

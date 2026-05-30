@@ -12,8 +12,8 @@ export interface Contributor {
 export interface ZephyrConfigData {
   version:      string;
   lock:         boolean;
-  strict:       boolean;   // when true, CI/CD Guardian enforces all policies
-  owners:       string[];
+  strict:       boolean;
+  owners:       string[];   // additional delegated owners (not the base owner)
   contributors: Contributor[];
 }
 
@@ -47,8 +47,26 @@ export function writeConfig(repoRoot: string, data: ZephyrConfigData): void {
   writeFileSync(configPath(repoRoot), JSON.stringify(data, null, 2), 'utf8');
 }
 
-export function isOwner(config: ZephyrConfigData, gitUserName: string): boolean {
-  if (!config.owners || config.owners.length === 0) return true;
+// ── Ownership ────────────────────────────────────────────────────────────────
+
+/**
+ * Primary rule: first commit author is always the base owner.
+ * Secondary: anyone in owners[] is also an owner.
+ */
+export function isOwner(
+  config:            ZephyrConfigData,
+  gitUserName:       string,
+  firstCommitAuthor: string,
+): boolean {
+  if (!gitUserName) return false;
+
+  // First commit author is always owner
+  if (
+    firstCommitAuthor &&
+    firstCommitAuthor.toLowerCase() === gitUserName.toLowerCase()
+  ) return true;
+
+  // Delegated owners
   return config.owners.some(o => o.toLowerCase() === gitUserName.toLowerCase());
 }
 
@@ -65,6 +83,8 @@ export function removeOwner(config: ZephyrConfigData, username: string): ZephyrC
   };
 }
 
+// ── Key hashing ──────────────────────────────────────────────────────────────
+
 export function hashPrivateKey(privateKey: string): string {
   return createHash('sha256').update(privateKey.trim()).digest('hex');
 }
@@ -72,6 +92,8 @@ export function hashPrivateKey(privateKey: string): string {
 export function verifyKey(privateKey: string, publicKey: string): boolean {
   return hashPrivateKey(privateKey) === publicKey;
 }
+
+// ── Contributors ─────────────────────────────────────────────────────────────
 
 export function addContributor(
   config:      ZephyrConfigData,
@@ -97,8 +119,12 @@ export function verifyContributorKey(
   return c;
 }
 
-export function requiresKeyAuth(config: ZephyrConfigData, gitUserName: string): boolean {
+export function requiresKeyAuth(
+  config:            ZephyrConfigData,
+  gitUserName:       string,
+  firstCommitAuthor: string,
+): boolean {
   if (config.contributors.length === 0) return false;
-  if (isOwner(config, gitUserName)) return false;
+  if (isOwner(config, gitUserName, firstCommitAuthor)) return false;
   return true;
 }
